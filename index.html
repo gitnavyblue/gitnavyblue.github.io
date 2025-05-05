@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canal de Comunicación Interestelar</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0a0a0a;
+      color: #00ffcc;
+      padding: 2em;
+      max-width: 800px;
+      margin: auto;
+    }
+    h1 {
+      color: #00ffcc;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      background: #111;
+      color: #00ffcc;
+      border: 1px solid #00ffcc;
+      padding: 1em;
+    }
+    button {
+      margin-top: 1em;
+      padding: 0.7em 1.5em;
+      background-color: #00ffcc;
+      color: black;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    pre {
+      background-color: #111;
+      padding: 1em;
+      white-space: pre-wrap;
+      border: 1px solid #00ffcc;
+      margin-top: 2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛰️ Canal Abierto</h1>
+  <p>Esta interfaz está preparada para recibir transmisiones.</p>
+  <form id="msgForm">
+    <textarea id="mensaje" placeholder="Ingrese mensaje..."></textarea>
+    <br>
+    <button type="submit">Enviar</button>
+  </form>
+  <pre id="respuesta">Esperando comunicación...</pre>
+
+  <script>
+    const form = document.getElementById('msgForm');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const mensaje = document.getElementById('mensaje').value;
+      const res = await fetch('/api/mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: mensaje })
+      });
+      const data = await res.json();
+      document.getElementById('respuesta').textContent = JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
