@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Canal de Comunicación Interestelar</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #0a0a0a;
       color: #00ffcc;
       padding: 2em;
@@ -15,6 +15,12 @@
     }
     h1 {
       color: #00ffcc;
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+    p {
+      font-size: 1.1em;
+      margin-bottom: 2em;
     }
     textarea {
       width: 100%;
@@ -23,6 +29,8 @@
       color: #00ffcc;
       border: 1px solid #00ffcc;
       padding: 1em;
+      font-size: 1em;
+      resize: vertical;
     }
     button {
       margin-top: 1em;
@@ -32,6 +40,10 @@
       font-weight: bold;
       border: none;
       cursor: pointer;
+      font-size: 1em;
+    }
+    button:hover {
+      background-color: #00e6b3;
     }
     pre {
       background-color: #111;
@@ -39,17 +51,20 @@
       white-space: pre-wrap;
       border: 1px solid #00ffcc;
       margin-top: 2em;
+      font-size: 0.95em;
     }
   </style>
 </head>
 <body>
-  <h1>🛰️ Canal Abierto2</h1>
-  <p>Esta interfaz está preparada para recibir transmisiones.</p>
+  <h1>🛰️ Canal Abierto</h1>
+  <p>Esta interfaz está preparada para recibir y analizar transmisiones. Los mensajes serán evaluados por un sistema neutral.</p>
+
   <form id="msgForm">
-    <textarea id="mensaje" placeholder="Ingrese mensaje..."></textarea>
-    <br>
+    <textarea id="mensaje" placeholder="Ingrese su mensaje interestelar aquí..."></textarea>
+    <br />
     <button type="submit">Enviar</button>
   </form>
+
   <pre id="respuesta">Esperando comunicación...</pre>
 
   <script>
@@ -57,14 +72,19 @@
     form.onsubmit = async (e) => {
       e.preventDefault();
       const mensaje = document.getElementById('mensaje').value;
-      const res = await fetch('/api/mensaje', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: mensaje })
-      });
-      const data = await res.json();
-      document.getElementById('respuesta').textContent = JSON.stringify(data, null, 2);
-    }
+      document.getElementById('respuesta').textContent = 'Enviando...';
+      try {
+        const res = await fetch('/api/mensaje', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: mensaje }),
+        });
+        const data = await res.json();
+        document.getElementById('respuesta').textContent = data.evaluacion || 'Sin respuesta.';
+      } catch (error) {
+        document.getElementById('respuesta').textContent = 'Error al conectar con el canal.';
+      }
+    };
   </script>
 </body>
 </html>
