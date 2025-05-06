@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Lector de Frecuencias</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #00ffcc;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 1em;
+    }
+    canvas {
+      background-color: #111;
+      display: block;
+      margin: 1em auto;
+      border: 1px solid #00ffcc;
+    }
+    button {
+      padding: 0.5em 1em;
+      background-color: #00ffcc;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎧 Lector de Frecuencias</h1>
+  <p>Este sistema está escuchando señales acústicas. Asegúrate de tener un micrófono activado.</p>
+  <button onclick="startAnalyzer()">Iniciar Análisis</button>
+  <canvas id="canvas" width="800" height="300"></canvas>
+
+  <script>
+    let audioContext, analyser, dataArray;
+
+    function startAnalyzer() {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        source.connect(analyser);
+        draw();
+      }).catch(err => {
+        alert('Error accediendo al micrófono: ' + err.message);
+      });
+    }
+
+    function draw() {
+      requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArray);
+
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / dataArray.length) * 2.5;
+      let x = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const barHeight = dataArray[i];
+        ctx.fillStyle = `rgb(${barHeight + 100}, 255, 200)`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+      }
+    }
+  </script>
+</body>
+</html>
