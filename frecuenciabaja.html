@@ -489,4 +489,55 @@
             
             // Dibujar la línea de frecuencia objetivo humana
             const humanTargetX = Math.floor(humanTargetFrequency / (audioContext.sampleRate / 2) * width);
-            canvasCtx.strokeStyle = 'rgba(255, 0,
+            canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(humanTargetX, 0);
+            canvasCtx.lineTo(humanTargetX, height);
+            canvasCtx.stroke();
+            
+            // Dibujar la línea divisoria entre frecuencias humanas y caninas
+            const dogFreqX = Math.floor(dogMinFrequency / (audioContext.sampleRate / 2) * width);
+            if (dogFreqX < width) { // Solo dibujar si es visible en el canvas
+                canvasCtx.strokeStyle = 'rgba(255, 128, 0, 0.7)';
+                canvasCtx.setLineDash([5, 5]); // Línea punteada
+                canvasCtx.lineWidth = 2;
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(dogFreqX, 0);
+                canvasCtx.lineTo(dogFreqX, height);
+                canvasCtx.stroke();
+                canvasCtx.setLineDash([]); // Restaurar línea sólida
+                
+                // Etiquetar la línea
+                canvasCtx.fillStyle = 'rgba(255, 128, 0, 0.9)';
+                canvasCtx.font = '10px Arial';
+                canvasCtx.fillText('20kHz (límite humano)', dogFreqX - 100, 12);
+            }
+            
+            // Dibujar el espectro con colores diferentes para frecuencias humanas y caninas
+            const barWidth = width / bufferLength * 2.5;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = dataArray[i] / 255 * height;
+                const freqAtI = i * (audioContext.sampleRate / 2) / bufferLength;
+                
+                // Color diferente para frecuencias audibles por perros pero no por humanos
+                if (freqAtI > dogMinFrequency) {
+                    canvasCtx.fillStyle = 'rgb(255, 128, 0)'; // Naranja para frecuencias caninas
+                } else {
+                    canvasCtx.fillStyle = 'rgb(0, 128, 255)'; // Azul para frecuencias humanas
+                }
+                
+                canvasCtx.fillRect(x, height - barHeight, barWidth, barHeight);
+                
+                x += barWidth + 1;
+                if (x > width) break;
+            }
+        }
+
+        // Registrar mensaje inicial
+        logEvent(`${new Date().toLocaleTimeString()} - Detector de frecuencia iniciado. Frecuencias objetivo: humana (${humanTargetFrequency} Hz) y canina (>${dogMinFrequency} Hz)`);
+    </script>
+</body>
+</html>
