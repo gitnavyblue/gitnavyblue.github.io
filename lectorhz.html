@@ -2,109 +2,109 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Lector de Frecuencias (Beta)</title>
+  <title>Lector de Frecuencias</title>
   <style>
     body {
       background: black;
-      color: lime;
+      color: #0f0;
       font-family: monospace;
-      text-align: center;
+      padding: 20px;
     }
     canvas {
+      background: #111;
       width: 100%;
       height: 200px;
-      background: #111;
-      display: block;
-      margin: 1em auto;
     }
-    .event-log {
-      max-height: 200px;
-      overflow-y: auto;
-      background: #222;
-      color: #0ff;
-      padding: 10px;
-      margin: 10px auto;
-      width: 90%;
-      border: 1px solid #0ff;
+    #frecuencia {
+      font-size: 2em;
+      margin-top: 1em;
     }
   </style>
 </head>
 <body>
-  <h1>🎧 Lector de Frecuencias</h1>
-  <canvas id="canvas" width="1024" height="200"></canvas>
-  <div class="event-log" id="eventLog">Esperando eventos clave...</div>
+  <h1>Lector de Frecuencias (Micrófono)</h1>
+  <p>Permite detectar tonos específicos como 440 Hz usando tu micrófono.</p>
+  <canvas id="canvas"></canvas>
+  <div id="frecuencia">Frecuencia: -- Hz</div>
+  <div id="log"></div>
 
   <script>
-    const FRECUENCIAS_CLAVE = [432, 440, 528, 1000];
-    const TOLERANCIA_HZ = 5; // +/- Hz
-    const DURACION_UMBRAL_MS = 1000;
-
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const eventLog = document.getElementById('eventLog');
+    const frecuenciaTexto = document.getElementById('frecuencia');
+    const log = document.getElementById('log');
+    canvas.width = window.innerWidth;
+    canvas.height = 200;
 
-    let detecciones = {};
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
+    let lastDetectionTime = 0;
+    let detecting = false;
 
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      function frecuenciaDeBin(bin) {
-        return bin * audioCtx.sampleRate / analyser.fftSize;
+    function getDominantFrequency(data, sampleRate) {
+      let maxAmp = -Infinity;
+      let index = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i] > maxAmp) {
+          maxAmp = data[i];
+          index = i;
+        }
       }
+      const freq = index * sampleRate / analyser.fftSize;
+      return freq;
+    }
 
-      function loop() {
-        requestAnimationFrame(loop);
-        analyser.getByteFrequencyData(dataArray);
+    async function initMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
 
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function draw() {
+          requestAnimationFrame(draw);
+          analyser.getByteFrequencyData(dataArray);
 
-        for (let i = 0; i < bufferLength; i++) {
-          const valor = dataArray[i];
-          const x = i * canvas.width / bufferLength;
-          const y = canvas.height - valor;
-          const freq = frecuenciaDeBin(i);
+          // Gráfico
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          const barWidth = canvas.width / bufferLength;
+          for (let i = 0; i < bufferLength; i++) {
+            const barHeight = dataArray[i] / 2;
+            ctx.fillStyle = dataArray[i] > 200 ? 'red' : 'lime';
+            ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth, barHeight);
+          }
 
-          let color = 'lime';
-          FRECUENCIAS_CLAVE.forEach(clave => {
-            if (Math.abs(freq - clave) < TOLERANCIA_HZ && valor > 100) {
-              color = 'red';
-              // captura de patrón por duración
-              if (!detecciones[clave]) {
-                detecciones[clave] = { inicio: Date.now(), activo: true };
-              } else if (detecciones[clave].activo && Date.now() - detecciones[clave].inicio > DURACION_UMBRAL_MS) {
-                logEvento(`Patrón detectado: ${clave} Hz mantenido > ${DURACION_UMBRAL_MS / 1000}s`);
-                detecciones[clave].activo = false;
+          // Frecuencia dominante
+          const dominantFreq = getDominantFrequency(dataArray, audioContext.sampleRate);
+          frecuenciaTexto.textContent = `Frecuencia: ${dominantFreq.toFixed(2)} Hz`;
+
+          // Detección de 440 Hz
+          if (dominantFreq > 435 && dominantFreq < 445) {
+            if (!detecting) {
+              lastDetectionTime = Date.now();
+              detecting = true;
+            } else {
+              const elapsed = Date.now() - lastDetectionTime;
+              if (elapsed > 1000) {
+                log.innerHTML = `<span style="color:red;">[${new Date().toLocaleTimeString()}] Patrón 440 Hz detectado durante > 1s</span>`;
               }
             }
-          });
-
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y, 2, canvas.height);
-        }
-
-        // limpieza de eventos viejos
-        for (let clave in detecciones) {
-          if (Date.now() - detecciones[clave].inicio > DURACION_UMBRAL_MS + 2000) {
-            delete detecciones[clave];
+          } else {
+            detecting = false;
           }
         }
+
+        draw();
+      } catch (err) {
+        log.textContent = 'Error al acceder al micrófono: ' + err.message;
       }
-
-      loop();
-    });
-
-    function logEvento(texto) {
-      const time = new Date().toLocaleTimeString();
-      eventLog.innerHTML = `[${time}] ${texto}<br>` + eventLog.innerHTML;
     }
+
+    initMic();
   </script>
 </body>
 </html>
