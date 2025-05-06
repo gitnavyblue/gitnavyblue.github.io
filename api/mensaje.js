@@ -17,7 +17,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo', // Cambio aquí
         messages: [
           {
             role: 'system',
@@ -34,8 +34,17 @@ export default async function handler(req, res) {
 
     const json = await openaiRes.json();
 
-    const respuesta = json.choices?.[0]?.message?.content || 'Sin respuesta procesable.';
+    // Verificación robusta
+    if (!json.choices || json.choices.length === 0 || !json.choices[0].message?.content) {
+      return res.status(500).json({
+        error: 'La API no devolvió una respuesta válida.',
+        detalle: json,
+      });
+    }
+
+    const respuesta = json.choices[0].message.content;
     res.status(200).json({ evaluacion: respuesta });
+
   } catch (error) {
     res.status(500).json({ error: 'Error al contactar a la API de OpenAI', detalle: error.message });
   }
