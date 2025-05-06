@@ -1,110 +1,376 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Lector de Frecuencias</title>
-  <style>
-    body {
-      background: black;
-      color: #0f0;
-      font-family: monospace;
-      padding: 20px;
-    }
-    canvas {
-      background: #111;
-      width: 100%;
-      height: 200px;
-    }
-    #frecuencia {
-      font-size: 2em;
-      margin-top: 1em;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detector de Frecuencia 440 Hz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #controls {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #frequencyDisplay {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        #visualization {
+            width: 100%;
+            height: 150px;
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            background-color: #f8f8f8;
+        }
+
+        #alert {
+            width: 100%;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+            background-color: #f44336;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        #log {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-y: auto;
+            text-align: left;
+            font-family: monospace;
+            background-color: #f9f9f9;
+        }
+
+        .sensitivity-control {
+            margin: 15px 0;
+        }
+
+        .detection-threshold {
+            margin: 15px 0;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f0f0f0;
+            margin: 0 auto;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-left: 10px;
+            background-color: #ccc;
+        }
+
+        .active {
+            background-color: #4CAF50;
+        }
+    </style>
 </head>
 <body>
-  <h1>Lector de Frecuencias (Micrófono)</h1>
-  <p>Permite detectar tonos específicos como 440 Hz usando tu micrófono.</p>
-  <canvas id="canvas"></canvas>
-  <div id="frecuencia">Frecuencia: -- Hz</div>
-  <div id="log"></div>
+    <h1>Detector de Frecuencia 440 Hz</h1>
+    <div id="status">
+        Estado: <span id="statusText">Inactivo</span>
+        <span class="status-indicator" id="statusIndicator"></span>
+    </div>
 
-  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const frecuenciaTexto = document.getElementById('frecuencia');
-    const log = document.getElementById('log');
-    canvas.width = window.innerWidth;
-    canvas.height = 200;
+    <div id="controls">
+        <button id="startButton">Iniciar detección</button>
+        <button id="stopButton" disabled>Detener</button>
+        <button id="clearLogButton">Limpiar registro</button>
+    </div>
 
-    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    let analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    <div class="sensitivity-control">
+        <label for="sensitivity">Sensibilidad del análisis: <span id="sensitivityValue">50</span>%</label>
+        <input type="range" id="sensitivity" min="10" max="100" value="50">
+    </div>
 
-    let lastDetectionTime = 0;
-    let detecting = false;
+    <div class="detection-threshold">
+        <label for="threshold">Umbral de detección: <span id="thresholdValue">10</span> Hz</label>
+        <input type="range" id="threshold" min="1" max="20" value="10">
+    </div>
 
-    function getDominantFrequency(data, sampleRate) {
-      let maxAmp = -Infinity;
-      let index = -1;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i] > maxAmp) {
-          maxAmp = data[i];
-          index = i;
-        }
-      }
-      const freq = index * sampleRate / analyser.fftSize;
-      return freq;
-    }
+    <div id="frequencyDisplay">Frecuencia actual: <span id="currentFreq">0</span> Hz</div>
 
-    async function initMic() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
+    <div id="alert">¡FRECUENCIA 440 Hz DETECTADA!</div>
 
-        function draw() {
-          requestAnimationFrame(draw);
-          analyser.getByteFrequencyData(dataArray);
+    <canvas id="visualization" width="700" height="150"></canvas>
 
-          // Gráfico
-          ctx.fillStyle = 'black';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          const barWidth = canvas.width / bufferLength;
-          for (let i = 0; i < bufferLength; i++) {
-            const barHeight = dataArray[i] / 2;
-            ctx.fillStyle = dataArray[i] > 200 ? 'red' : 'lime';
-            ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth, barHeight);
-          }
+    <h3>Registro de eventos</h3>
+    <div id="log"></div>
 
-          // Frecuencia dominante
-          const dominantFreq = getDominantFrequency(dataArray, audioContext.sampleRate);
-          frecuenciaTexto.textContent = `Frecuencia: ${dominantFreq.toFixed(2)} Hz`;
+    <script>
+        // Variables globales
+        let audioContext;
+        let analyser;
+        let microphone;
+        let isRunning = false;
+        let targetFrequency = 440;
+        let detectionEvents = [];
+        let lastDetectionTime = 0;
+        let detectionTimeout;
+        let animationFrame;
+        
+        // Referencias a elementos DOM
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const clearLogButton = document.getElementById('clearLogButton');
+        const currentFreq = document.getElementById('currentFreq');
+        const sensitivitySlider = document.getElementById('sensitivity');
+        const sensitivityValue = document.getElementById('sensitivityValue');
+        const thresholdSlider = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('thresholdValue');
+        const alert = document.getElementById('alert');
+        const log = document.getElementById('log');
+        const statusText = document.getElementById('statusText');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const canvas = document.getElementById('visualization');
+        const canvasCtx = canvas.getContext('2d');
 
-          // Detección de 440 Hz
-          if (dominantFreq > 435 && dominantFreq < 445) {
-            if (!detecting) {
-              lastDetectionTime = Date.now();
-              detecting = true;
-            } else {
-              const elapsed = Date.now() - lastDetectionTime;
-              if (elapsed > 1000) {
-                log.innerHTML = `<span style="color:red;">[${new Date().toLocaleTimeString()}] Patrón 440 Hz detectado durante > 1s</span>`;
-              }
+        // Event listeners
+        startButton.addEventListener('click', startDetection);
+        stopButton.addEventListener('click', stopDetection);
+        clearLogButton.addEventListener('click', clearLog);
+        
+        sensitivitySlider.addEventListener('input', () => {
+            sensitivityValue.textContent = sensitivitySlider.value;
+        });
+        
+        thresholdSlider.addEventListener('input', () => {
+            thresholdValue.textContent = thresholdSlider.value;
+        });
+
+        // Función para iniciar la detección
+        async function startDetection() {
+            try {
+                // Solicitar permiso para acceder al micrófono
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Crear un nuevo contexto de audio
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                
+                // Configuración del analizador
+                analyser.fftSize = 2048;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                // Conectar el micrófono
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                // Actualizar la interfaz
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                statusText.textContent = "Activo";
+                statusIndicator.classList.add('active');
+                
+                isRunning = true;
+                
+                // Iniciar el bucle de detección
+                function detectLoop() {
+                    if (!isRunning) return;
+                    
+                    // Obtener datos de frecuencia
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    // Calcular la frecuencia dominante
+                    const dominantFrequency = findDominantFrequency(dataArray, audioContext.sampleRate);
+                    currentFreq.textContent = dominantFrequency.toFixed(1);
+                    
+                    // Verificar si estamos cerca de la frecuencia objetivo
+                    const threshold = parseInt(thresholdSlider.value);
+                    if (Math.abs(dominantFrequency - targetFrequency) <= threshold && dominantFrequency > 0) {
+                        // Evitar múltiples detecciones muy seguidas
+                        const now = Date.now();
+                        if (now - lastDetectionTime > 2000) {
+                            lastDetectionTime = now;
+                            frequencyDetected(dominantFrequency);
+                        }
+                        
+                        // Mostrar alerta
+                        alert.style.display = 'block';
+                        
+                        // Ocultar la alerta después de un tiempo
+                        clearTimeout(detectionTimeout);
+                        detectionTimeout = setTimeout(() => {
+                            alert.style.display = 'none';
+                        }, 2000);
+                    }
+                    
+                    // Dibujar la visualización
+                    drawVisualization(dataArray, bufferLength);
+                    
+                    // Continuar el bucle
+                    animationFrame = requestAnimationFrame(detectLoop);
+                }
+                
+                detectLoop();
+                
+            } catch (error) {
+                console.error('Error al acceder al micrófono:', error);
+                logEvent(`Error: ${error.message}`);
             }
-          } else {
-            detecting = false;
-          }
         }
 
-        draw();
-      } catch (err) {
-        log.textContent = 'Error al acceder al micrófono: ' + err.message;
-      }
-    }
+        // Función para detener la detección
+        function stopDetection() {
+            if (microphone) {
+                microphone.disconnect();
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+            }
+            
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+            
+            // Actualizar la interfaz
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            statusText.textContent = "Inactivo";
+            statusIndicator.classList.remove('active');
+            alert.style.display = 'none';
+            
+            isRunning = false;
+        }
 
-    initMic();
-  </script>
+        // Función para encontrar la frecuencia dominante
+        function findDominantFrequency(dataArray, sampleRate) {
+            const bufferLength = dataArray.length;
+            
+            // Usar la sensibilidad para determinar el umbral de ruido
+            const sensitivity = parseInt(sensitivitySlider.value);
+            const noiseThreshold = Math.floor(255 * (1 - sensitivity / 100));
+            
+            // Encontrar el pico máximo
+            let maxIndex = 0;
+            let maxValue = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                if (dataArray[i] > maxValue && dataArray[i] > noiseThreshold) {
+                    maxValue = dataArray[i];
+                    maxIndex = i;
+                }
+            }
+            
+            // Convertir el índice a frecuencia
+            // La fórmula es: índice * (sampleRate / 2) / bufferLength
+            const frequency = maxIndex * (sampleRate / 2) / bufferLength;
+            
+            // Si no hay suficiente señal, devolver 0
+            if (maxValue < noiseThreshold) {
+                return 0;
+            }
+            
+            return frequency;
+        }
+
+        // Función para registrar una detección
+        function frequencyDetected(frequency) {
+            const time = new Date().toLocaleTimeString();
+            const event = {
+                time: time,
+                frequency: frequency.toFixed(1)
+            };
+            
+            // Guardar el evento
+            detectionEvents.push(event);
+            
+            // Actualizar el registro
+            logEvent(`${time} - Frecuencia detectada: ${frequency.toFixed(1)} Hz`);
+        }
+
+        // Función para agregar un evento al registro
+        function logEvent(message) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            log.appendChild(logEntry);
+            
+            // Scroll al final del registro
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Función para limpiar el registro
+        function clearLog() {
+            log.innerHTML = '';
+            detectionEvents = [];
+        }
+
+        // Función para dibujar la visualización
+        function drawVisualization(dataArray, bufferLength) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Limpiar el canvas
+            canvasCtx.clearRect(0, 0, width, height);
+            
+            // Dibujar la línea de frecuencia objetivo
+            const targetX = Math.floor(targetFrequency / (audioContext.sampleRate / 2) * width);
+            canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(targetX, 0);
+            canvasCtx.lineTo(targetX, height);
+            canvasCtx.stroke();
+            
+            // Dibujar el espectro
+            canvasCtx.fillStyle = 'rgb(0, 128, 255)';
+            
+            const barWidth = width / bufferLength * 2.5;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = dataArray[i] / 255 * height;
+                
+                canvasCtx.fillRect(x, height - barHeight, barWidth, barHeight);
+                
+                x += barWidth + 1;
+                if (x > width) break;
+            }
+        }
+
+        // Registrar mensaje inicial
+        logEvent(`${new Date().toLocaleTimeString()} - Detector de frecuencia iniciado. Frecuencia objetivo: ${targetFrequency} Hz`);
+    </script>
 </body>
 </html>
