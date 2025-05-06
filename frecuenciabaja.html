@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detector de Frecuencias</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #controls {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #frequencyDisplay {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        #visualization {
+            width: 100%;
+            height: 150px;
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            background-color: #f8f8f8;
+        }
+
+        .alert {
+            width: 100%;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        #humanAlert {
+            background-color: #f44336;
+            color: white;
+        }
+
+        #dogAlert {
+            background-color: #ff9800;
+            color: black;
+        }
+
+        #log {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-y: auto;
+            text-align: left;
+            font-family: monospace;
+            background-color: #f9f9f9;
+        }
+
+        .sensitivity-control {
+            margin: 15px 0;
+        }
+
+        .detection-threshold {
+            margin: 15px 0;
+        }
+
+        .frequency-settings {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .frequency-group {
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            min-width: 280px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f0f0f0;
+            margin: 0 auto;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-left: 10px;
+            background-color: #ccc;
+        }
+
+        .active {
+            background-color: #4CAF50;
+        }
+
+        table {
+            width: 100%;
+            margin: 15px 0;
+            border-collapse: collapse;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .info-section {
+            text-align: left;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Detector de Frecuencias</h1>
+    <div id="status">
+        Estado: <span id="statusText">Inactivo</span>
+        <span class="status-indicator" id="statusIndicator"></span>
+    </div>
+
+    <div class="info-section">
+        <h3>Sobre las frecuencias detectadas:</h3>
+        <ul>
+            <li><strong>Humanos:</strong> Pueden oír entre 20 Hz y 20 kHz aproximadamente</li>
+            <li><strong>Perros:</strong> Pueden oír entre 67 Hz y 45 kHz aproximadamente</li>
+        </ul>
+        <p>Este detector está configurado para identificar la frecuencia estándar (La = 440 Hz) y frecuencias altas que solo los perros pueden oír (>20 kHz).</p>
+    </div>
+
+    <div id="controls">
+        <button id="startButton">Iniciar detección</button>
+        <button id="stopButton" disabled>Detener</button>
+        <button id="clearLogButton">Limpiar registro</button>
+    </div>
+
+    <div class="frequency-settings">
+        <div class="frequency-group">
+            <h3>Frecuencia Humana (440 Hz)</h3>
+            <div class="detection-threshold">
+                <label for="humanThreshold">Umbral: <span id="humanThresholdValue">10</span> Hz</label>
+                <input type="range" id="humanThreshold" min="1" max="20" value="10">
+            </div>
+        </div>
+        
+        <div class="frequency-group">
+            <h3>Frecuencia Canina (>20kHz)</h3>
+            <div class="detection-threshold">
+                <label for="dogThreshold">Umbral: <span id="dogThresholdValue">1000</span> Hz</label>
+                <input type="range" id="dogThreshold" min="500" max="2000" value="1000">
+            </div>
+        </div>
+    </div>
+
+    <div class="sensitivity-control">
+        <label for="sensitivity">Sensibilidad del análisis: <span id="sensitivityValue">50</span>%</label>
+        <input type="range" id="sensitivity" min="10" max="100" value="50">
+    </div>
+
+    <div id="frequencyDisplay">Frecuencia actual: <span id="currentFreq">0</span> Hz</div>
+
+    <div id="humanAlert" class="alert">¡FRECUENCIA 440 Hz DETECTADA!</div>
+    <div id="dogAlert" class="alert">¡FRECUENCIA CANINA DETECTADA! (>20kHz)</div>
+
+    <canvas id="visualization" width="700" height="150"></canvas>
+
+    <h3>Registro de eventos</h3>
+    <div id="log"></div>
+
+    <script>
+        // Variables globales
+        let audioContext;
+        let analyser;
+        let microphone;
+        let isRunning = false;
+        let humanTargetFrequency = 440; // Frecuencia La estándar
+        let dogMinFrequency = 20000;    // Frecuencias por encima de lo audible por humanos
+        let detectionEvents = [];
+        let lastHumanDetectionTime = 0;
+        let lastDogDetectionTime = 0;
+        let detectionTimeout;
+        let animationFrame;
+        
+        // Referencias a elementos DOM
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const clearLogButton = document.getElementById('clearLogButton');
+        const currentFreq = document.getElementById('currentFreq');
+        const sensitivitySlider = document.getElementById('sensitivity');
+        const sensitivityValue = document.getElementById('sensitivityValue');
+        const humanThresholdSlider = document.getElementById('humanThreshold');
+        const humanThresholdValue = document.getElementById('humanThresholdValue');
+        const dogThresholdSlider = document.getElementById('dogThreshold');
+        const dogThresholdValue = document.getElementById('dogThresholdValue');
+        const humanAlert = document.getElementById('humanAlert');
+        const dogAlert = document.getElementById('dogAlert');
+        const log = document.getElementById('log');
+        const statusText = document.getElementById('statusText');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const canvas = document.getElementById('visualization');
+        const canvasCtx = canvas.getContext('2d');
+
+        // Event listeners
+        startButton.addEventListener('click', startDetection);
+        stopButton.addEventListener('click', stopDetection);
+        clearLogButton.addEventListener('click', clearLog);
+        
+        sensitivitySlider.addEventListener('input', () => {
+            sensitivityValue.textContent = sensitivitySlider.value;
+        });
+        
+        humanThresholdSlider.addEventListener('input', () => {
+            humanThresholdValue.textContent = humanThresholdSlider.value;
+        });
+        
+        dogThresholdSlider.addEventListener('input', () => {
+            dogThresholdValue.textContent = dogThresholdSlider.value;
+        });
+
+        // Función para iniciar la detección
+        async function startDetection() {
+            try {
+                // Solicitar permiso para acceder al micrófono
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        sampleRate: 192000 // Solicitar la mayor tasa de muestreo posible
+                    } 
+                });
+                
+                // Crear un nuevo contexto de audio
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 192000 // Solicitar la mayor tasa de muestreo posible
+                });
+                
+                logEvent(`Tasa de muestreo disponible: ${audioContext.sampleRate} Hz`);
+                logEvent(`Frecuencia máxima detectable: ${audioContext.sampleRate / 2} Hz`);
+                
+                analyser = audioContext.createAnalyser();
+                
+                // Configuración del analizador para mayor precisión
+                analyser.fftSize = 8192; // Valor más alto para mejor resolución
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                // Conectar el micrófono
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                // Actualizar la interfaz
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                statusText.textContent = "Activo";
+                statusIndicator.classList.add('active');
+                
+                isRunning = true;
+                
+                // Iniciar el bucle de detección
+                function detectLoop() {
+                    if (!isRunning) return;
+                    
+                    // Obtener datos de frecuencia
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    // Calcular la frecuencia dominante
+                    const frequencies = findSignificantFrequencies(dataArray, audioContext.sampleRate);
+                    const dominantFrequency = frequencies.dominant;
+                    const highestFrequency = frequencies.highest;
+                    
+                    currentFreq.textContent = dominantFrequency.toFixed(1);
+                    
+                    const now = Date.now();
+                    
+                    // Verificar si estamos cerca de la frecuencia objetivo humana (440 Hz)
+                    const humanThreshold = parseInt(humanThresholdSlider.value);
+                    if (Math.abs(dominantFrequency - humanTargetFrequency) <= humanThreshold && dominantFrequency > 0) {
+                        // Evitar múltiples detecciones muy seguidas
+                        if (now - lastHumanDetectionTime > 2000) {
+                            lastHumanDetectionTime = now;
+                            frequencyDetected(dominantFrequency, "humana");
+                        }
+                        
+                        // Mostrar alerta
+                        humanAlert.style.display = 'block';
+                        
+                        // Ocultar la alerta después de un tiempo
+                        clearTimeout(detectionTimeout);
+                        detectionTimeout = setTimeout(() => {
+                            humanAlert.style.display = 'none';
+                        }, 2000);
+                    } else {
+                        humanAlert.style.display = 'none';
+                    }
+                    
+                    // Verificar frecuencias caninas (>20kHz)
+                    const dogThreshold = parseInt(dogThresholdSlider.value);
+                    if (highestFrequency > dogMinFrequency) {
+                        // Evitar múltiples detecciones muy seguidas
+                        if (now - lastDogDetectionTime > 3000) {
+                            lastDogDetectionTime = now;
+                            frequencyDetected(highestFrequency, "canina");
+                        }
+                        
+                        // Mostrar alerta
+                        dogAlert.style.display = 'block';
+                        
+                        // Ocultar la alerta después de un tiempo
+                        setTimeout(() => {
+                            dogAlert.style.display = 'none';
+                        }, 2000);
+                    } else {
+                        dogAlert.style.display = 'none';
+                    }
+                    
+                    // Dibujar la visualización
+                    drawVisualization(dataArray, bufferLength);
+                    
+                    // Continuar el bucle
+                    animationFrame = requestAnimationFrame(detectLoop);
+                }
+                
+                detectLoop();
+                
+            } catch (error) {
+                console.error('Error al acceder al micrófono:', error);
+                logEvent(`Error: ${error.message}`);
+            }
+        }
+
+        // Función para detener la detección
+        function stopDetection() {
+            if (microphone) {
+                microphone.disconnect();
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+            }
+            
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+            
+            // Actualizar la interfaz
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            statusText.textContent = "Inactivo";
+            statusIndicator.classList.remove('active');
+            humanAlert.style.display = 'none';
+            dogAlert.style.display = 'none';
+            
+            isRunning = false;
+        }
+
+        // Función para encontrar frecuencias significativas
+        function findSignificantFrequencies(dataArray, sampleRate) {
+            const bufferLength = dataArray.length;
+            
+            // Usar la sensibilidad para determinar el umbral de ruido
+            const sensitivity = parseInt(sensitivitySlider.value);
+            const noiseThreshold = Math.floor(255 * (1 - sensitivity / 100));
+            
+            // Encontrar el pico máximo (frecuencia dominante)
+            let maxIndex = 0;
+            let maxValue = 0;
+            
+            // Encontrar la frecuencia más alta por encima del umbral
+            let highestFreqIndex = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                if (dataArray[i] > maxValue && dataArray[i] > noiseThreshold) {
+                    maxValue = dataArray[i];
+                    maxIndex = i;
+                }
+                
+                // Actualizar la frecuencia más alta que supera el umbral de ruido
+                if (dataArray[i] > noiseThreshold && i > highestFreqIndex) {
+                    highestFreqIndex = i;
+                }
+            }
+            
+            // Convertir los índices a frecuencias
+            // La fórmula es: índice * (sampleRate / 2) / bufferLength
+            const dominantFrequency = maxIndex * (sampleRate / 2) / bufferLength;
+            const highestFrequency = highestFreqIndex * (sampleRate / 2) / bufferLength;
+            
+            // Si no hay suficiente señal, devolver 0
+            if (maxValue < noiseThreshold) {
+                return { dominant: 0, highest: 0 };
+            }
+            
+            return { 
+                dominant: dominantFrequency,
+                highest: highestFrequency
+            };
+        }
+
+        // Función para registrar una detección
+        function frequencyDetected(frequency, type) {
+            const time = new Date().toLocaleTimeString();
+            const event = {
+                time: time,
+                frequency: frequency.toFixed(1),
+                type: type
+            };
+            
+            // Guardar el evento
+            detectionEvents.push(event);
+            
+            // Actualizar el registro
+            if (type === "humana") {
+                logEvent(`${time} - Frecuencia humana detectada: ${frequency.toFixed(1)} Hz`);
+            } else if (type === "canina") {
+                logEvent(`${time} - ¡Frecuencia canina detectada! ${frequency.toFixed(1)} Hz (inaudible para humanos)`);
+            }
+        }
+
+        // Función para agregar un evento al registro
+        function logEvent(message) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            log.appendChild(logEntry);
+            
+            // Scroll al final del registro
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Función para limpiar el registro
+        function clearLog() {
+            log.innerHTML = '';
+            detectionEvents = [];
+        }
+
+        // Función para dibujar la visualización
+        function drawVisualization(dataArray, bufferLength) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Limpiar el canvas
+            canvasCtx.clearRect(0, 0, width, height);
+            
+            // Dibujar la línea de frecuencia objetivo humana
+            const humanTargetX = Math.floor(humanTargetFrequency / (audioContext.sampleRate / 2) * width);
+            canvasCtx.strokeStyle = 'rgba(255, 0,
