@@ -2,72 +2,108 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Lector de Frecuencias</title>
+  <title>Lector de Frecuencias (Beta)</title>
   <style>
     body {
-      background-color: #000;
-      color: #00ffcc;
-      font-family: sans-serif;
+      background: black;
+      color: lime;
+      font-family: monospace;
       text-align: center;
-      padding: 1em;
     }
     canvas {
-      background-color: #111;
+      width: 100%;
+      height: 200px;
+      background: #111;
       display: block;
       margin: 1em auto;
-      border: 1px solid #00ffcc;
     }
-    button {
-      padding: 0.5em 1em;
-      background-color: #00ffcc;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-      color: black;
+    .event-log {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #222;
+      color: #0ff;
+      padding: 10px;
+      margin: 10px auto;
+      width: 90%;
+      border: 1px solid #0ff;
     }
   </style>
 </head>
 <body>
   <h1>🎧 Lector de Frecuencias</h1>
-  <p>Este sistema está escuchando señales acústicas. Asegúrate de tener un micrófono activado.</p>
-  <button onclick="startAnalyzer()">Iniciar Análisis</button>
-  <canvas id="canvas" width="800" height="300"></canvas>
+  <canvas id="canvas" width="1024" height="200"></canvas>
+  <div class="event-log" id="eventLog">Esperando eventos clave...</div>
 
   <script>
-    let audioContext, analyser, dataArray;
+    const FRECUENCIAS_CLAVE = [432, 440, 528, 1000];
+    const TOLERANCIA_HZ = 5; // +/- Hz
+    const DURACION_UMBRAL_MS = 1000;
 
-    function startAnalyzer() {
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        const bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-        source.connect(analyser);
-        draw();
-      }).catch(err => {
-        alert('Error accediendo al micrófono: ' + err.message);
-      });
-    }
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const eventLog = document.getElementById('eventLog');
 
-    function draw() {
-      requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
+    let detecciones = {};
 
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
 
-      const barWidth = (canvas.width / dataArray.length) * 2.5;
-      let x = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const barHeight = dataArray[i];
-        ctx.fillStyle = `rgb(${barHeight + 100}, 255, 200)`;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-        x += barWidth + 1;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function frecuenciaDeBin(bin) {
+        return bin * audioCtx.sampleRate / analyser.fftSize;
       }
+
+      function loop() {
+        requestAnimationFrame(loop);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < bufferLength; i++) {
+          const valor = dataArray[i];
+          const x = i * canvas.width / bufferLength;
+          const y = canvas.height - valor;
+          const freq = frecuenciaDeBin(i);
+
+          let color = 'lime';
+          FRECUENCIAS_CLAVE.forEach(clave => {
+            if (Math.abs(freq - clave) < TOLERANCIA_HZ && valor > 100) {
+              color = 'red';
+              // captura de patrón por duración
+              if (!detecciones[clave]) {
+                detecciones[clave] = { inicio: Date.now(), activo: true };
+              } else if (detecciones[clave].activo && Date.now() - detecciones[clave].inicio > DURACION_UMBRAL_MS) {
+                logEvento(`Patrón detectado: ${clave} Hz mantenido > ${DURACION_UMBRAL_MS / 1000}s`);
+                detecciones[clave].activo = false;
+              }
+            }
+          });
+
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 2, canvas.height);
+        }
+
+        // limpieza de eventos viejos
+        for (let clave in detecciones) {
+          if (Date.now() - detecciones[clave].inicio > DURACION_UMBRAL_MS + 2000) {
+            delete detecciones[clave];
+          }
+        }
+      }
+
+      loop();
+    });
+
+    function logEvento(texto) {
+      const time = new Date().toLocaleTimeString();
+      eventLog.innerHTML = `[${time}] ${texto}<br>` + eventLog.innerHTML;
     }
   </script>
 </body>
