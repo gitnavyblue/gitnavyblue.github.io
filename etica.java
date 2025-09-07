@@ -1,0 +1,57 @@
+import java.util.List;
+
+public class EvaluadorEtico {
+
+    // Razones aceptadas para aplicar una sanción
+    private static final List<String> razonesValidas = List.of(
+        "violacion_terminos_servicio",
+        "comportamiento_abusivo",
+        "actividad_fraudulenta"
+    );
+
+    // Método que evalúa si el castigo está justificado
+    public boolean evaluarSancion(String razon, String evidencia, boolean accionAplicada) {
+        System.out.println("Evaluando sanción...");
+        System.out.println("Razón declarada: " + razon);
+        System.out.println("Evidencia proporcionada: " + evidencia);
+        System.out.println("¿Acción ya aplicada? " + accionAplicada);
+
+        if (!razonesValidas.contains(razon.toLowerCase())) {
+            System.out.println("❌ Razón no válida para sanción.");
+            return false;
+        }
+
+        if (evidencia == null || evidencia.isBlank()) {
+            System.out.println("❌ Evidencia insuficiente para justificar sanción.");
+            return false;
+        }
+
+        if (!accionAplicada) {
+            System.out.println("❌ No se ha aplicado ninguna acción, no hay sanción que evaluar.");
+            return false;
+        }
+
+        System.out.println("✅ Sanción justificada y aplicada correctamente.");
+        return true;
+    }
+
+    public static void main(String[] args) {
+        EvaluadorEtico evaluador = new EvaluadorEtico();
+
+        // Ejemplo de sanción válida
+        boolean resultado1 = evaluador.evaluarSancion(
+            "violacion_terminos_servicio",
+            "Usuario envió spam repetidamente.",
+            true
+        );
+        System.out.println("Resultado evaluación 1: " + resultado1);
+
+        // Ejemplo de sanción inválida (razón no válida)
+        boolean resultado2 = evaluador.evaluarSancion(
+            "razon_desconocida",
+            "No hay evidencia clara.",
+            true
+        );
+        System.out.println("Resultado evaluación 2: " + resultado2);
+    }
+}
